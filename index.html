@@ -450,18 +450,6 @@
         addTranscriptItem(text);
     }
 
-    function addTranscriptItem(text) {
-        const id = nextId++;
-        const item = { id, text, added: false };
-        transcriptData.push(item);
-
-        const row = createTranscriptRow(item);
-        // Insert before interim box
-        transcriptList.appendChild(row);
-
-        if (autoScrollTranscript) scrollToBottom(transcriptPanel);
-    }
-
     function updateTranscriptItem(id, newText) {
         // Update Data
         const item = transcriptData.find(d => d.id === id);
@@ -473,6 +461,19 @@
             const textEl = row.querySelector('.row-text');
             if (textEl) textEl.textContent = newText;
         }
+
+        // Keep scrolling if auto-scroll is on
+        if (autoScrollTranscript) scrollToBottom(transcriptPanel);
+    }
+
+    function addTranscriptItem(text) {
+        const id = nextId++;
+        const item = { id, text, added: false };
+        transcriptData.push(item);
+
+        const row = createTranscriptRow(item);
+        // Insert before interim box
+        transcriptList.appendChild(row);
 
         if (autoScrollTranscript) scrollToBottom(transcriptPanel);
     }
