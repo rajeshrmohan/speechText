@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Voice Notes</title>
+
+<!-- PWA / Mobile App Installation Meta Tags -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Voice Notes">
+<meta name="theme-color" content="#2196F3">
+
 <style>
     :root {
         --bg-color: #f4f4f9;
@@ -310,6 +317,81 @@
 </footer>
 
 <script>
+    // --- PWA INSTALLATION CODE ---
+    (function() {
+        // 1. Generate Icon using Canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        // Background (Match --primary)
+        ctx.fillStyle = '#2196F3';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Microphone Icon
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        // Mic body
+        ctx.roundRect(176, 128, 160, 256, 80);
+        ctx.fill();
+        // Mic stand base
+        ctx.fillRect(236, 400, 40, 50);
+        // Mic stand foot
+        ctx.beginPath();
+        ctx.arc(256, 460, 60, 0, Math.PI, true);
+        ctx.fill();
+
+        const iconUrl = canvas.toDataURL('image/png');
+
+        // 2. Create Manifest Object
+        const manifest = {
+            "name": "Voice Notes",
+            "short_name": "Voice Notes",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#f4f4f9",
+            "theme_color": "#2196F3",
+            "icons": [
+                {
+                    "src": iconUrl,
+                    "sizes": "512x512",
+                    "type": "image/png"
+                }
+            ]
+        };
+
+        // 3. Inject Manifest Link
+        const stringManifest = JSON.stringify(manifest);
+        const blobManifest = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blobManifest);
+        
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestURL;
+        document.head.appendChild(link);
+
+        // 4. Register a "Dummy" Service Worker to satisfy Chrome Install Criteria
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', (e) => self.skipWaiting());
+                self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
+                self.addEventListener('fetch', (e) => {
+                    // Network only strategy
+                    e.respondWith(fetch(e.request));
+                });
+            `;
+            const blobSW = new Blob([swCode], {type: 'application/javascript'});
+            const swURL = URL.createObjectURL(blobSW);
+            
+            navigator.serviceWorker.register(swURL)
+                .then(() => console.log('SW Registered'))
+                .catch((err) => console.log('SW Registration failed', err));
+        }
+    })();
+
+    // --- ORIGINAL APP CODE STARTS HERE ---
+
     // --- 1. Variables ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition;
