@@ -1,445 +1,356 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>SpeechNote</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Speech to Text App</title>
+<style>
+    :root {
+        --bg-color: #f4f4f9;
+        --card-bg: #ffffff;
+        --primary: #2196F3;
+        --primary-dark: #1976D2;
+        --success: #4CAF50;
+        --danger: #f44336;
+        --text-main: #333;
+        --text-muted: #777;
+        --border: #ddd;
+        --header-height: 130px; /* Approx height of header + controls */
+        --footer-height: 100px;
+    }
+
+    * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden; /* Prevent body scroll, handle inside panels */
+    }
+
+    /* === HEADER === */
+    header {
+        background: var(--card-bg);
+        padding: 10px 15px;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+        z-index: 10;
+    }
+
+    .app-title-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    h1 {
+        margin: 0;
+        font-size: 1.2rem;
+        color: var(--primary-dark);
+    }
+
+    #status {
+        font-size: 0.9rem;
+        font-weight: bold;
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: #eee;
+    }
+
+    .controls-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    select {
+        flex: 1;
+        height: 44px;
+        padding: 0 10px;
+        font-size: 1rem;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: white;
+    }
+
+    /* === BUTTONS === */
+    button {
+        height: 44px; /* Touch target size */
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        font-weight: 500;
+        padding: 0 15px;
+        cursor: pointer;
+        transition: background 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-outline { background: transparent; border: 1px solid var(--text-muted); color: var(--text-muted); font-size: 0.9rem; }
+
+    /* === MAIN CONTENT (PANELS) === */
+    main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 10px;
+        gap: 10px;
+    }
+
+    .panel {
+        flex: 1;
+        background: var(--card-bg);
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .panel-header {
+        padding: 8px 12px;
+        background: #fafafa;
+        border-bottom: 1px solid var(--border);
+        font-weight: bold;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .panel-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0;
+        scroll-behavior: smooth;
+    }
+
+    /* === TRANSCRIPT LIST === */
+    .row {
+        display: flex;
+        align-items: flex-start;
+        padding: 12px;
+        border-bottom: 1px solid #eee;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    .row-text {
+        flex: 1;
+        padding-right: 10px;
+        font-size: 1.05rem;
+        line-height: 1.4;
+        word-wrap: break-word;
+        user-select: text;
+    }
+
+    .row-action {
+        flex-shrink: 0;
+    }
+
+    .row-added {
+        background-color: #f9f9f9;
+    }
+    .row-added .row-text {
+        color: #999;
+        text-decoration: line-through;
+    }
+
+    .btn-add {
+        font-size: 0.85rem;
+        height: 36px;
+        padding: 0 12px;
+    }
+
+    /* === INTERIM TEXT === */
+    #interimBox {
+        padding: 12px;
+        font-style: italic;
+        color: var(--primary);
+        border-bottom: 1px solid #eee;
+        display: none; /* Hidden when empty */
+    }
+    #interimBox.active {
+        display: block;
+    }
+
+    /* === FOOTER === */
+    footer {
+        padding: 10px 15px;
+        background: var(--card-bg);
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .footer-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+    }
     
-    <!-- PWA / Mobile App Installation Meta Tags -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="SpeechNote">
-    <meta name="theme-color" content="#2563eb">
+    .footer-actions button {
+        flex: 1;
+        font-size: 0.9rem;
+    }
 
-    <style>
-        :root {
-            --primary-color: #2563eb;
-            --success-color: #16a34a;
-            --danger-color: #dc2626;
-            --bg-color: #f8fafc;
-            --surface-color: #ffffff;
-            --text-color: #1e293b;
-            --border-color: #cbd5e1;
-            --muted-text: #64748b;
-            --spacing-unit: 12px;
-        }
+    .privacy-note {
+        text-align: center;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 5px;
+    }
 
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
+    /* Overlay for unsupported */
+    #unsupported {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: white;
+        z-index: 1000;
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        padding: 20px;
+    }
 
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            height: 100vh; /* Fallback */
-            height: 100dvh; /* Dynamic viewport height for mobile browsers */
-            display: flex;
-            flex-direction: column;
-            overflow: hidden; /* Prevent body scroll */
-            overscroll-behavior-y: contain; /* Prevent pull-to-refresh interfering */
-        }
+    /* Panel specific scroll hint */
+    .scroll-paused {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.6);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    .panel:hover .scroll-paused.visible {
+        opacity: 1;
+    }
 
-        /* --- Header --- */
-        header {
-            background-color: var(--surface-color);
-            padding: var(--spacing-unit);
-            padding-top: max(var(--spacing-unit), env(safe-area-inset-top));
-            border-bottom: 1px solid var(--border-color);
-            flex-shrink: 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 20;
-        }
-
-        h1 {
-            margin: 0;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-
-        #status-indicator {
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: var(--muted-text);
-            padding: 4px 8px;
-            border-radius: 4px;
-            background-color: #f1f5f9;
-            white-space: nowrap;
-        }
-
-        #status-indicator.listening { color: var(--primary-color); background-color: #dbeafe; }
-        #status-indicator.error { color: var(--danger-color); background-color: #fee2e2; }
-        #status-indicator.no-permission { color: #b91c1c; background-color: #fecaca; }
-
-        /* --- Controls --- */
-        .controls {
-            padding: var(--spacing-unit);
-            background-color: var(--surface-color);
-            border-bottom: 1px solid var(--border-color);
-            flex-shrink: 0;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: var(--spacing-unit);
-            align-items: center;
-            z-index: 20;
-        }
-
-        .language-select {
-            grid-column: 1 / -1;
-            padding: 8px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 1rem;
-            background-color: var(--bg-color);
-            appearance: none;
-        }
-
-        button {
-            height: 48px; /* Touch target size */
-            border: none;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        #btn-start {
-            background-color: var(--primary-color);
-            color: white;
-        }
-
-        #btn-stop {
-            background-color: var(--surface-color);
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-        }
-        
-        #btn-stop.active {
-            background-color: var(--danger-color);
-            color: white;
-            border-color: var(--danger-color);
-        }
-
-        /* --- Live Preview --- */
-        #live-box {
-            background-color: #fffbeb; /* Light yellow for interim */
-            color: #b45309;
-            padding: 8px var(--spacing-unit);
-            min-height: 36px;
-            font-style: italic;
-            font-size: 0.95rem;
-            border-bottom: 1px solid var(--border-color);
-            flex-shrink: 0;
-        }
-        #live-text:empty::before {
-            content: "...";
-            opacity: 0.5;
-        }
-
-        /* --- Main Panels Container --- */
-        .panels-container {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden; /* Critical for independent scrolling */
-            background-color: var(--bg-color);
-            position: relative;
-        }
-
-        .panel-header {
-            padding: 8px var(--spacing-unit);
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--muted-text);
-            background-color: var(--surface-color);
-            border-bottom: 1px solid var(--border-color);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        .scroll-panel {
-            flex: 1; /* Distribute space equally */
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-            touch-action: pan-y; /* Allow vertical scrolling */
-        }
-
-        /* Transcript Styling */
-        .transcript-list {
-            list-style: none;
-            padding: var(--spacing-unit);
-            margin: 0;
-            /* Ensure list items stack correctly */
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .transcript-row {
-            background-color: var(--surface-color);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 10px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            /* Ensure row doesn't shrink on mobile */
-            min-width: 0; 
-        }
-
-        .transcript-row.added {
-            border-color: var(--success-color);
-            background-color: #f0fdf4;
-        }
-
-        .transcript-text {
-            flex-grow: 1;
-            font-size: 1rem;
-            line-height: 1.4;
-            word-break: break-word;
-            user-select: text;
-        }
-
-        .btn-add {
-            flex-shrink: 0;
-            padding: 6px 12px;
-            height: auto;
-            min-height: 36px;
-            font-size: 0.85rem;
-            background-color: var(--primary-color);
-            color: white;
-            border-radius: 4px;
-        }
-
-        .btn-add:disabled {
-            background-color: var(--success-color);
-            cursor: default;
-        }
-
-        /* Selected Styling */
-        .selected-list {
-            list-style: none;
-            padding: var(--spacing-unit);
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 1px;
-        }
-
-        .selected-item {
-            background-color: var(--surface-color);
-            padding: 10px;
-            font-size: 0.95rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-radius: 4px;
-        }
-        
-        .selected-ts { font-size: 0.75rem; color: var(--muted-text); margin-left: 8px; white-space: nowrap;}
-
-        /* --- Footer --- */
-        footer {
-            padding: var(--spacing-unit);
-            padding-bottom: max(var(--spacing-unit), env(safe-area-inset-bottom));
-            background-color: var(--surface-color);
-            border-top: 1px solid var(--border-color);
-            flex-shrink: 0;
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            z-index: 20;
-        }
-
-        .footer-btn {
-            flex: 1;
-            background-color: var(--surface-color);
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-            font-size: 0.85rem;
-            height: 40px;
-            min-width: 0;
-        }
-
-        #btn-copy {
-            background-color: var(--text-color);
-            color: white;
-            border-color: var(--text-color);
-        }
-
-        .privacy-note {
-            text-align: center;
-            font-size: 0.7rem;
-            color: var(--muted-text);
-            padding: 4px 0 0 0;
-            flex-basis: 100%;
-        }
-
-        /* --- Utilities --- */
-        .hidden { display: none !important; }
-
-        @media (min-width: 768px) {
-            .panels-container {
-                flex-direction: row;
-            }
-        }
-    </style>
+</style>
 </head>
 <body>
 
-<!-- PWA Setup Script -->
-<script>
-    (function() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#2563eb';
-        ctx.fillRect(0, 0, 512, 512);
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.roundRect(176, 128, 160, 256, 80);
-        ctx.fill();
-        ctx.fillRect(236, 400, 40, 50);
-        ctx.beginPath();
-        ctx.arc(256, 460, 60, 0, Math.PI, true);
-        ctx.fill();
-        const iconUrl = canvas.toDataURL('image/png');
-        const manifest = {
-            "name": "SpeechNote", "short_name": "SpeechNote", "start_url": ".", "display": "standalone",
-            "background_color": "#f8fafc", "theme_color": "#2563eb",
-            "icons": [{ "src": iconUrl, "sizes": "512x512", "type": "image/png" }]
-        };
-        const stringManifest = JSON.stringify(manifest);
-        const blobManifest = new Blob([stringManifest], {type: 'application/json'});
-        const manifestURL = URL.createObjectURL(blobManifest);
-        const link = document.createElement('link');
-        link.rel = 'manifest';
-        link.href = manifestURL;
-        document.head.appendChild(link);
-        if ('serviceWorker' in navigator) {
-            const swCode = `self.addEventListener('install', (e) => self.skipWaiting()); self.addEventListener('activate', (e) => e.waitUntil(clients.claim())); self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request)); });`;
-            navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode], {type: 'application/javascript'}))).catch(() => {});
-        }
-    })();
-</script>
+<div id="unsupported">
+    <h2>Browser Not Supported</h2>
+    <p>This app requires the Web Speech API.</p>
+    <p>Please use <strong>Google Chrome on Android</strong> or Desktop.</p>
+</div>
 
 <header>
-    <h1>SpeechNote</h1>
-    <span id="status-indicator" aria-live="polite">Idle</span>
+    <div class="app-title-row">
+        <h1>Voice Notes</h1>
+        <div id="status" aria-live="polite">Idle</div>
+    </div>
+    <div class="controls-row">
+        <button id="btnStart" class="btn-success">Start</button>
+        <button id="btnStop" class="btn-danger" disabled>Stop</button>
+        <select id="langSelect">
+            <option value="en-SG">English (SG)</option>
+            <option value="en-US">English (US)</option>
+            <option value="zh-SG">Chinese (SG)</option>
+        </select>
+    </div>
 </header>
 
 <main>
-    <div class="controls">
-        <select id="lang-select" class="language-select" aria-label="Select Language">
-            <option value="en-SG" selected>English (Singapore)</option>
-            <option value="en-US">English (US)</option>
-            <option value="zh-SG">Chinese (Singapore)</option>
-        </select>
-        <button id="btn-start">Start</button>
-        <button id="btn-stop" disabled>Stop</button>
-    </div>
-
-    <div id="live-box">
-        <span id="live-text"></span>
-    </div>
-
-    <div class="panels-container">
-        <!-- Panel A: Transcript -->
-        <div style="display: flex; flex-direction: column; flex: 1; min-height: 0; border-right: 1px solid var(--border-color);">
-            <div class="panel-header">Transcript (Newest Top)</div>
-            <div id="transcript-panel" class="scroll-panel">
-                <ul id="transcript-list" class="transcript-list">
-                    <!-- Entries go here -->
-                </ul>
-                <div id="empty-transcript-msg" style="text-align: center; color: var(--muted-text); margin-top: 20px;">
-                    Waiting for speech...
-                </div>
-            </div>
+    <!-- Panel A: Transcript -->
+    <div class="panel">
+        <div class="panel-header">
+            <span>Transcript</span>
         </div>
+        <div class="panel-content" id="transcriptPanel">
+            <div id="interimBox"></div>
+            <div id="transcriptList"></div>
+        </div>
+    </div>
 
-        <!-- Panel B: Selected -->
-        <div style="display: flex; flex-direction: column; flex: 1; min-height: 0; background-color: #f1f5f9;">
-            <div class="panel-header">Selected</div>
-            <div id="selected-panel" class="scroll-panel">
-                <ul id="selected-list" class="selected-list">
-                    <!-- Selected entries go here -->
-                </ul>
-                <div id="empty-selected-msg" style="text-align: center; color: var(--muted-text); margin-top: 20px;">
-                    No items added yet.
-                </div>
-            </div>
+    <!-- Panel B: Selected -->
+    <div class="panel">
+        <div class="panel-header">
+            <span>Selected</span>
+        </div>
+        <div class="panel-content" id="selectedPanel">
+            <div id="selectedList"></div>
         </div>
     </div>
 </main>
 
 <footer>
-    <button id="btn-clear-transcript" class="footer-btn">Clear Transcript</button>
-    <button id="btn-clear-selected" class="footer-btn">Clear Selected</button>
-    <button id="btn-copy" class="footer-btn">Copy Selected</button>
-    <div class="privacy-note">Runs locally. No audio uploaded.</div>
+    <div class="footer-actions">
+        <button id="btnClearT" class="btn-outline">Clear T</button>
+        <button id="btnClearS" class="btn-outline">Clear S</button>
+        <button id="btnCopy" class="btn-primary">Copy Selected</button>
+    </div>
+    <div class="privacy-note">
+        Runs locally in your browser. No audio is uploaded.
+    </div>
 </footer>
 
 <script>
-    /**
-     * App State
-     */
-    const state = {
-        transcriptData: [],
-        selectedData: [],
-        nextId: 1,
-        isListening: false,
-        lang: 'en-SG',
-        autoScrollTop: true,
-        sentenceBuffer: '' // Buffer to accumulate words into sentences
-    };
-
-    /**
-     * DOM Elements
-     */
-    const els = {
-        status: document.getElementById('status-indicator'),
-        langSelect: document.getElementById('lang-select'),
-        btnStart: document.getElementById('btn-start'),
-        btnStop: document.getElementById('btn-stop'),
-        liveText: document.getElementById('live-text'),
-        transcriptPanel: document.getElementById('transcript-panel'),
-        transcriptList: document.getElementById('transcript-list'),
-        emptyTranscriptMsg: document.getElementById('empty-transcript-msg'),
-        selectedPanel: document.getElementById('selected-panel'),
-        selectedList: document.getElementById('selected-list'),
-        emptySelectedMsg: document.getElementById('empty-selected-msg'),
-        btnClearTranscript: document.getElementById('btn-clear-transcript'),
-        btnClearSelected: document.getElementById('btn-clear-selected'),
-        btnCopy: document.getElementById('btn-copy')
-    };
-
-    /**
-     * Web Speech API Setup
-     */
+    // --- 1. Variables & State ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let recognition = null;
+    let recognition;
+    let isListening = false;
+    let shouldBeListening = false; // Flag for manual stop vs error stop
+    let autoScrollTranscript = true;
+    let transcriptData = []; // {id, text, added}
+    let selectedData = [];   // {id, text}
+    let nextId = 1;
 
+    // DOM Elements
+    const statusEl = document.getElementById('status');
+    const interimBox = document.getElementById('interimBox');
+    const transcriptList = document.getElementById('transcriptList');
+    const transcriptPanel = document.getElementById('transcriptPanel');
+    const selectedList = document.getElementById('selectedList');
+    const selectedPanel = document.getElementById('selectedPanel');
+    
+    // Controls
+    const btnStart = document.getElementById('btnStart');
+    const btnStop = document.getElementById('btnStop');
+    const langSelect = document.getElementById('langSelect');
+    
+    // Actions
+    const btnClearT = document.getElementById('btnClearT');
+    const btnClearS = document.getElementById('btnClearS');
+    const btnCopy = document.getElementById('btnCopy');
+
+    // --- 2. Initialization ---
     if (!SpeechRecognition) {
-        setStatus('not-supported');
-        els.btnStart.disabled = true;
-        els.langSelect.disabled = true;
+        document.getElementById('unsupported').style.display = 'flex';
     } else {
         initRecognition();
     }
@@ -448,53 +359,50 @@
         recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = state.lang;
+        recognition.lang = langSelect.value;
 
         recognition.onstart = () => {
-            state.isListening = true;
-            state.sentenceBuffer = ''; // Reset buffer
-            setStatus('listening');
-            els.btnStart.disabled = true;
-            els.btnStop.disabled = false;
-            els.btnStop.classList.add('active');
-        };
-
-        recognition.onend = () => {
-            // Flush any remaining buffer on stop
-            if (state.sentenceBuffer.trim().length > 0) {
-                addTranscriptEntry(state.sentenceBuffer.trim());
-                state.sentenceBuffer = '';
-            }
-
-            if (state.isListening) {
-                try {
-                    recognition.start();
-                } catch (e) {
-                    console.error("Restart failed", e);
-                    stopListening();
-                }
-            } else {
-                stopListening();
-            }
+            isListening = true;
+            statusEl.textContent = 'Listening...';
+            statusEl.style.backgroundColor = '#d4edda'; // Light green
+            statusEl.style.color = '#155724';
+            btnStart.disabled = true;
+            btnStop.disabled = false;
+            langSelect.disabled = true;
         };
 
         recognition.onerror = (event) => {
-            console.error("Speech recognition error", event.error);
+            console.error("Speech Error:", event.error);
             if (event.error === 'not-allowed') {
-                setStatus('no-permission');
-                state.isListening = false;
-                els.btnStart.disabled = false;
-                els.btnStop.disabled = true;
+                statusEl.textContent = 'No Permission';
+                statusEl.style.backgroundColor = '#f8d7da';
+                statusEl.style.color = '#721c24';
+                shouldBeListening = false;
             } else if (event.error === 'no-speech') {
-                // Ignore
+                // Ignore no-speech, just stay listening usually
             } else {
-                setStatus('error', event.error);
+                statusEl.textContent = 'Error: ' + event.error;
+            }
+        };
+
+        recognition.onend = () => {
+            isListening = false;
+            if (shouldBeListening) {
+                // Attempt restart if we didn't manually stop
+                // Android Chrome sometimes stops automatically
+                try {
+                    recognition.start();
+                } catch (e) {
+                    resetUIState();
+                }
+            } else {
+                resetUIState();
             }
         };
 
         recognition.onresult = (event) => {
-            let interimTranscript = '';
             let finalTranscript = '';
+            let interimTranscript = '';
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
@@ -504,281 +412,206 @@
                 }
             }
 
-            // Handle Final Results (Accumulate into buffer)
+            // Handle Interim
+            if (interimTranscript) {
+                interimBox.textContent = interimTranscript;
+                interimBox.classList.add('active');
+                if(autoScrollTranscript) scrollToBottom(transcriptPanel);
+            } else {
+                interimBox.textContent = '';
+                interimBox.classList.remove('active');
+            }
+
+            // Handle Final
             if (finalTranscript) {
-                state.sentenceBuffer += finalTranscript;
-                
-                // Check punctuation to determine if we should commit to the list
-                // This solves the "every word has an add button" issue
-                const trimmedBuffer = state.sentenceBuffer.trim();
-                const lastChar = trimmedBuffer.slice(-1);
-                const punctuation = ['.', '?', '!', '。', '？', '！'];
-                
-                // Also commit if buffer gets too long (arbitrary 150 chars) to avoid huge blocks
-                if (punctuation.includes(lastChar) || trimmedBuffer.length > 150) {
-                    addTranscriptEntry(trimmedBuffer);
-                    state.sentenceBuffer = ''; // Clear buffer
-                    // Live box shows just interim now
-                    els.liveText.textContent = interimTranscript ? interimTranscript : '';
-                } else {
-                    // Show accumulated buffer + interim in Live Box
-                    els.liveText.textContent = trimmedBuffer + (interimTranscript ? ' ' + interimTranscript : '');
+                finalTranscript = finalTranscript.trim();
+                if(finalTranscript.length > 0) {
+                    addTranscriptItem(finalTranscript);
                 }
-            } else if (interimTranscript) {
-                // Only interim, show buffer + interim
-                els.liveText.textContent = state.sentenceBuffer + (interimTranscript ? ' ' + interimTranscript : '');
             }
         };
     }
 
-    /**
-     * Logic Functions
-     */
+    function resetUIState() {
+        isListening = false;
+        shouldBeListening = false;
+        statusEl.textContent = 'Stopped';
+        statusEl.style.backgroundColor = '#eee';
+        statusEl.style.color = '#333';
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        langSelect.disabled = false;
+    }
 
-    function startListening() {
-        if (!recognition) return;
-        state.lang = els.langSelect.value;
-        recognition.lang = state.lang;
-        
+    // --- 3. Core Logic ---
+
+    // Start Button
+    btnStart.addEventListener('click', () => {
+        shouldBeListening = true;
+        recognition.lang = langSelect.value;
         try {
             recognition.start();
-        } catch (e) {
-            console.warn(e);
+        } catch(e) {
+            console.error(e);
         }
-    }
+    });
 
-    function stopListening() {
-        if (!recognition) return;
-        state.isListening = false;
+    // Stop Button
+    btnStop.addEventListener('click', () => {
+        shouldBeListening = false;
         recognition.stop();
-        
-        setStatus('stopped');
-        els.btnStart.disabled = false;
-        els.btnStop.disabled = true;
-        els.btnStop.classList.remove('active');
-        els.liveText.textContent = '';
+    });
+
+    // Add Transcript Item
+    function addTranscriptItem(text) {
+        const id = nextId++;
+        const item = { id, text, added: false };
+        transcriptData.push(item);
+
+        const row = createTranscriptRow(item);
+        transcriptList.appendChild(row);
+
+        if (autoScrollTranscript) {
+            scrollToBottom(transcriptPanel);
+        }
     }
 
-    function addTranscriptEntry(text) {
-        if (!text) return;
+    // Create HTML for Transcript Row
+    function createTranscriptRow(item) {
+        const div = document.createElement('div');
+        div.className = 'row';
+        div.id = `t-row-${item.id}`;
 
-        els.emptyTranscriptMsg.style.display = 'none';
+        const textDiv = document.createElement('div');
+        textDiv.className = 'row-text';
+        textDiv.textContent = item.text;
 
-        const id = state.nextId++;
-        const entry = {
-            id: id,
-            text: text,
-            ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            added: false
-        };
+        const actionDiv = document.createElement('div');
+        actionDiv.className = 'row-action';
 
-        state.transcriptData.unshift(entry);
+        const btn = document.createElement('button');
+        btn.textContent = 'Add';
+        btn.className = 'btn-primary btn-add';
+        btn.onclick = () => handleAddClick(item.id, btn);
+
+        actionDiv.appendChild(btn);
+        div.appendChild(textDiv);
+        div.appendChild(actionDiv);
+
+        return div;
+    }
+
+    // Handle "Add" Click
+    function handleAddClick(id, btnElement) {
+        const item = transcriptData.find(d => d.id === id);
+        if (item && !item.added) {
+            // Update data
+            item.added = true;
+            selectedData.push({ id: item.id, text: item.text });
+
+            // Update UI
+            const row = document.getElementById(`t-row-${id}`);
+            row.classList.add('row-added');
+            
+            btnElement.textContent = 'Added';
+            btnElement.disabled = true;
+            btnElement.className = 'btn-outline btn-add';
+
+            // Render Selected
+            addSelectedRow(item);
+        }
+    }
+
+    // Add Row to Selected Panel
+    function addSelectedRow(item) {
+        const div = document.createElement('div');
+        div.className = 'row';
         
-        // Create DOM elements
-        const li = document.createElement('li');
-        li.className = 'transcript-row';
-        li.id = `row-${id}`;
+        const textDiv = document.createElement('div');
+        textDiv.className = 'row-text';
+        textDiv.textContent = item.text;
+
+        div.appendChild(textDiv);
+        selectedList.appendChild(div);
         
-        const spanText = document.createElement('span');
-        spanText.className = 'transcript-text';
-        spanText.textContent = text;
+        // Always scroll selected to bottom
+        scrollToBottom(selectedPanel);
+    }
 
-        const btnAdd = document.createElement('button');
-        btnAdd.className = 'btn-add';
-        btnAdd.textContent = 'Add';
-        btnAdd.onclick = () => addToSelected(id);
+    // Scroll Helper
+    function scrollToBottom(element) {
+        element.scrollTop = element.scrollHeight;
+    }
 
-        li.appendChild(spanText);
-        li.appendChild(btnAdd);
-        
-        // PREPEND to top
-        els.transcriptList.prepend(li);
+    // Scroll Detection (User manual scroll)
+    transcriptPanel.addEventListener('scroll', () => {
+        const threshold = 50;
+        const position = transcriptPanel.scrollTop + transcriptPanel.clientHeight;
+        const height = transcriptPanel.scrollHeight;
 
-        // Scroll Logic
-        // If user is near top (scrollTop < threshold), keep snapping to top.
-        // If user has scrolled down, DO NOT snap back up, allowing them to read history.
-        if (state.autoScrollTop) {
-            // Use requestAnimationFrame to ensure DOM is painted before scrolling
-            requestAnimationFrame(() => {
-                els.transcriptPanel.scrollTop = 0;
+        // If user is close to bottom, enable auto-scroll, else disable
+        if (height - position < threshold) {
+            autoScrollTranscript = true;
+        } else {
+            autoScrollTranscript = false;
+        }
+    });
+
+    // --- 4. Footer Actions ---
+
+    // Clear Transcript
+    btnClearT.addEventListener('click', () => {
+        if(confirm("Clear all transcript history?")) {
+            transcriptData = [];
+            transcriptList.innerHTML = '';
+            // Reset ID doesn't strictly matter but keeps it clean
+        }
+    });
+
+    // Clear Selected
+    btnClearS.addEventListener('click', () => {
+        if(confirm("Clear selected notes?")) {
+            selectedData = [];
+            selectedList.innerHTML = '';
+            
+            // Reset buttons in transcript
+            transcriptData.forEach(item => {
+                item.added = false;
+                const row = document.getElementById(`t-row-${item.id}`);
+                if (row) {
+                    row.classList.remove('row-added');
+                    const btn = row.querySelector('button');
+                    btn.textContent = 'Add';
+                    btn.disabled = false;
+                    btn.className = 'btn-primary btn-add';
+                }
             });
         }
-    }
+    });
 
-    function addToSelected(id) {
-        const entry = state.transcriptData.find(e => e.id === id);
-        if (!entry || entry.added) return;
-
-        entry.added = true;
-        state.selectedData.push({
-            id: entry.id,
-            text: entry.text,
-            ts: entry.ts
-        });
-
-        const row = document.getElementById(`row-${id}`);
-        if (row) {
-            row.classList.add('added');
-            const btn = row.querySelector('.btn-add');
-            btn.disabled = true;
-            btn.textContent = 'Added';
-        }
-
-        renderSelectedPanel();
-    }
-
-    function renderSelectedPanel() {
-        els.selectedList.innerHTML = '';
+    // Copy Selected
+    btnCopy.addEventListener('click', async () => {
+        if (selectedData.length === 0) return;
         
-        if (state.selectedData.length > 0) {
-            els.emptySelectedMsg.style.display = 'none';
-            state.selectedData.forEach(item => {
-                const li = document.createElement('li');
-                li.className = 'selected-item';
-                
-                const spanText = document.createElement('span');
-                spanText.textContent = item.text;
-                
-                const spanTs = document.createElement('span');
-                spanTs.className = 'selected-ts';
-                spanTs.textContent = item.ts;
-
-                li.appendChild(spanText);
-                li.appendChild(spanTs);
-                els.selectedList.appendChild(li);
-            });
-            // Always auto-scroll selected to bottom (newest at bottom of list is standard)
-            els.selectedPanel.scrollTop = els.selectedPanel.scrollHeight;
-        } else {
-            els.emptySelectedMsg.style.display = 'block';
-        }
-    }
-
-    function setStatus(type, msg) {
-        els.status.className = '';
-        if (type === 'not-supported') {
-            els.status.textContent = 'Not supported in this browser. Use Chrome.';
-            els.status.classList.add('error');
-        } else if (type === 'listening') {
-            els.status.textContent = 'Listening...';
-            els.status.classList.add('listening');
-        } else if (type === 'stopped') {
-            els.status.textContent = 'Stopped';
-        } else if (type === 'no-permission') {
-            els.status.textContent = 'No Permission';
-            els.status.classList.add('no-permission');
-            alert('Microphone permission denied. Please allow access in your browser settings.');
-        } else if (type === 'error') {
-            els.status.textContent = 'Error: ' + (msg || 'Unknown');
-            els.status.classList.add('error');
-        } else {
-            els.status.textContent = 'Idle';
-        }
-    }
-
-    /**
-     * Scrolling Logic
-     */
-    function isNearTop(element) {
-        // Allow user to scroll down 150px before we consider them "reading history"
-        const threshold = 150;
-        return element.scrollTop < threshold;
-    }
-
-    // Detect user scroll interaction on transcript panel
-    els.transcriptPanel.addEventListener('scroll', () => {
-        // If user scrolled away from top, pause auto-scroll
-        state.autoScrollTop = isNearTop(els.transcriptPanel);
-    });
-
-    /**
-     * Event Listeners
-     */
-    els.btnStart.addEventListener('click', startListening);
-    els.btnStop.addEventListener('click', stopListening);
-
-    els.langSelect.addEventListener('change', () => {
-        if (state.isListening) {
-            stopListening();
-            setTimeout(startListening, 100);
-        }
-    });
-
-    els.btnClearTranscript.addEventListener('click', () => {
-        state.transcriptData = [];
-        els.transcriptList.innerHTML = '';
-        els.emptyTranscriptMsg.style.display = 'block';
-        state.sentenceBuffer = '';
-    });
-
-    els.btnClearSelected.addEventListener('click', () => {
-        state.selectedData = [];
-        state.transcriptData.forEach(t => t.added = false);
-        const rows = els.transcriptList.querySelectorAll('.transcript-row');
-        rows.forEach(row => {
-            row.classList.remove('added');
-            const btn = row.querySelector('.btn-add');
-            btn.disabled = false;
-            btn.textContent = 'Add';
-        });
-        renderSelectedPanel();
-    });
-
-    els.btnCopy.addEventListener('click', () => {
-        if (state.selectedData.length === 0) return;
+        const allText = selectedData.map(i => i.text).join('\n');
         
-        const textToCopy = state.selectedData.map(item => item.text).join('\n');
-        
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(textToCopy)
-                .then(() => showToast('Copied to clipboard!'))
-                .catch(err => {
-                    console.error('Copy failed', err);
-                    fallbackCopy(textToCopy);
-                });
-        } else {
-            fallbackCopy(textToCopy);
-        }
-    });
-
-    function fallbackCopy(text) {
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.position = "fixed";  
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
         try {
-            const successful = document.execCommand('copy');
-            if(successful) showToast('Copied to clipboard!');
+            await navigator.clipboard.writeText(allText);
+            const originalText = btnCopy.textContent;
+            btnCopy.textContent = "Copied!";
+            btnCopy.classList.remove('btn-primary');
+            btnCopy.classList.add('btn-success');
+            
+            setTimeout(() => {
+                btnCopy.textContent = originalText;
+                btnCopy.classList.remove('btn-success');
+                btnCopy.classList.add('btn-primary');
+            }, 2000);
         } catch (err) {
-            console.error('Fallback copy failed', err);
-            showToast('Failed to copy');
+            alert('Failed to copy: ' + err);
         }
-        document.body.removeChild(textArea);
-    }
+    });
 
-    function showToast(msg) {
-        const toast = document.createElement('div');
-        toast.textContent = msg;
-        toast.style.position = 'fixed';
-        toast.style.bottom = '80px';
-        toast.style.left = '50%';
-        toast.style.transform = 'translateX(-50%)';
-        toast.style.backgroundColor = 'rgba(0,0,0,0.8)';
-        toast.style.color = '#fff';
-        toast.style.padding = '8px 16px';
-        toast.style.borderRadius = '20px';
-        toast.style.fontSize = '0.9rem';
-        toast.style.zIndex = '1000';
-        
-        document.body.appendChild(toast);
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transition = 'opacity 0.5s';
-            setTimeout(() => document.body.removeChild(toast), 500);
-        }, 2000);
-    }
 </script>
 </body>
 </html>
