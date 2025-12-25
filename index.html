@@ -319,74 +319,27 @@
 <script>
     // --- PWA INSTALLATION CODE ---
     (function() {
-        // 1. Generate Icon using Canvas
         const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
+        canvas.width = 512; canvas.height = 512;
         const ctx = canvas.getContext('2d');
-        
-        // Background (Match --primary)
-        ctx.fillStyle = '#2196F3';
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Microphone Icon
+        ctx.fillStyle = '#2196F3'; ctx.fillRect(0, 0, 512, 512);
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        // Mic body
-        ctx.roundRect(176, 128, 160, 256, 80);
-        ctx.fill();
-        // Mic stand base
+        ctx.beginPath(); ctx.roundRect(176, 128, 160, 256, 80); ctx.fill();
         ctx.fillRect(236, 400, 40, 50);
-        // Mic stand foot
-        ctx.beginPath();
-        ctx.arc(256, 460, 60, 0, Math.PI, true);
-        ctx.fill();
-
+        ctx.beginPath(); ctx.arc(256, 460, 60, 0, Math.PI, true); ctx.fill();
         const iconUrl = canvas.toDataURL('image/png');
-
-        // 2. Create Manifest Object
         const manifest = {
-            "name": "Voice Notes",
-            "short_name": "Voice Notes",
-            "start_url": ".",
-            "display": "standalone",
-            "background_color": "#f4f4f9",
-            "theme_color": "#2196F3",
-            "icons": [
-                {
-                    "src": iconUrl,
-                    "sizes": "512x512",
-                    "type": "image/png"
-                }
-            ]
+            "name": "Voice Notes", "short_name": "Voice Notes", "start_url": ".", "display": "standalone",
+            "background_color": "#f4f4f9", "theme_color": "#2196F3",
+            "icons": [{ "src": iconUrl, "sizes": "512x512", "type": "image/png" }]
         };
-
-        // 3. Inject Manifest Link
-        const stringManifest = JSON.stringify(manifest);
-        const blobManifest = new Blob([stringManifest], {type: 'application/json'});
-        const manifestURL = URL.createObjectURL(blobManifest);
-        
-        const link = document.createElement('link');
-        link.rel = 'manifest';
-        link.href = manifestURL;
+        const link = document.createElement('link'); link.rel = 'manifest';
+        link.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type: 'application/json'}));
         document.head.appendChild(link);
-
-        // 4. Register a "Dummy" Service Worker to satisfy Chrome Install Criteria
         if ('serviceWorker' in navigator) {
-            const swCode = `
-                self.addEventListener('install', (e) => self.skipWaiting());
-                self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
-                self.addEventListener('fetch', (e) => {
-                    // Network only strategy
-                    e.respondWith(fetch(e.request));
-                });
-            `;
-            const blobSW = new Blob([swCode], {type: 'application/javascript'});
-            const swURL = URL.createObjectURL(blobSW);
-            
-            navigator.serviceWorker.register(swURL)
-                .then(() => console.log('SW Registered'))
-                .catch((err) => console.log('SW Registration failed', err));
+            navigator.serviceWorker.register(
+                URL.createObjectURL(new Blob([`self.addEventListener('fetch',e=>e.respondWith(fetch(e.request)))`], {type: 'text/javascript'}))
+            ).catch(()=>{});
         }
     })();
 
@@ -403,6 +356,9 @@
     // Data Models
     let transcriptData = []; // Array of { id, text, added (bool) }
     let selectedData = [];   // Array of { id, text }
+
+    // Wake Lock Variable
+    let wakeLock = null;
 
     // DOM Elements
     const statusEl = document.getElementById('status');
@@ -425,6 +381,62 @@
         initRecognition();
     }
 
+    // --- STORAGE LOGIC (ADDED) ---
+    function saveToLocalStorage() {
+        localStorage.setItem('voiceNotes_transcript', JSON.stringify(transcriptData));
+        localStorage.setItem('voiceNotes_selected', JSON.stringify(selectedData));
+    }
+
+    function loadFromLocalStorage() {
+        const savedTranscript = localStorage.getItem('voiceNotes_transcript');
+        const savedSelected = localStorage.getItem('voiceNotes_selected');
+
+        if (savedTranscript) {
+            transcriptData = JSON.parse(savedTranscript);
+            transcriptData.forEach(item => {
+                const row = createTranscriptRow(item);
+                transcriptList.appendChild(row);
+                // Ensure nextId doesn't collide
+                if (item.id >= nextId) nextId = item.id + 1;
+            });
+        }
+
+        if (savedSelected) {
+            selectedData = JSON.parse(savedSelected);
+            selectedData.forEach(item => {
+                renderSelectedRow(item.text);
+            });
+        }
+    }
+
+    // --- WAKE LOCK LOGIC (ADDED) ---
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                console.log('Wake Lock is active');
+            } catch (err) {
+                console.log(`Wake Lock error: ${err.name}, ${err.message}`);
+            }
+        }
+    }
+
+    function releaseWakeLock() {
+        if (wakeLock !== null) {
+            wakeLock.release().then(() => {
+                wakeLock = null;
+                console.log('Wake Lock released');
+            });
+        }
+    }
+
+    // Re-acquire wake lock if visibility changes (e.g. switching tabs)
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') {
+            await requestWakeLock();
+        }
+    });
+
     // --- 3. Speech Recognition Logic ---
     function initRecognition() {
         recognition = new SpeechRecognition();
@@ -435,6 +447,7 @@
 
         recognition.onstart = () => {
             isListening = true;
+            requestWakeLock(); // Keep screen on
             statusEl.textContent = 'Listening';
             statusEl.style.backgroundColor = '#d4edda';
             statusEl.style.color = '#155724';
@@ -452,6 +465,7 @@
                 statusEl.style.backgroundColor = '#f8d7da';
                 statusEl.style.color = '#721c24';
                 shouldBeListening = false;
+                releaseWakeLock(); // Allow sleep
             } else {
                 statusEl.textContent = 'Error';
             }
@@ -464,11 +478,11 @@
                 try {
                     recognition.start();
                 } catch (e) {
-                    // Start might fail if already started or denied
                     setTimeout(() => { if(shouldBeListening) recognition.start(); }, 100);
                 }
             } else {
                 resetUI();
+                releaseWakeLock(); // Allow sleep
             }
         };
 
@@ -489,7 +503,6 @@
             if (interimTranscript) {
                 interimBox.textContent = interimTranscript;
                 interimBox.classList.add('active');
-                // Move interim box to the bottom of the list visually
                 transcriptPanel.appendChild(interimBox); 
                 if (autoScrollTranscript) scrollToBottom(transcriptPanel);
             } else {
@@ -508,43 +521,34 @@
     function handleFinalResult(text) {
         if (!text) return;
 
-        // Get the last item to check for the Android "growing text" bug
-        // Bug pattern: "is" -> "is that" -> "is that so" (all marked final sequentially)
         const lastItem = transcriptData.length > 0 ? transcriptData[transcriptData.length - 1] : null;
 
         if (lastItem && !lastItem.added) {
-            // Check for prefix match (Case insensitive)
             const cleanText = text.toLowerCase();
             const cleanLast = lastItem.text.toLowerCase();
 
-            // 1. Exact duplicate? Ignore.
             if (cleanText === cleanLast) return;
 
-            // 2. Is this an extension of the previous line? (Android Bug Fix)
-            // If new text starts with the old text, we UPDATE the old row instead of adding new.
             if (cleanText.startsWith(cleanLast) && cleanText.length > cleanLast.length) {
                 updateTranscriptItem(lastItem.id, text);
                 return;
             }
         }
 
-        // Otherwise, add as new row
         addTranscriptItem(text);
     }
 
     function updateTranscriptItem(id, newText) {
-        // Update Data
         const item = transcriptData.find(d => d.id === id);
         if (item) item.text = newText;
 
-        // Update DOM
         const row = document.getElementById(`row-${id}`);
         if (row) {
             const textEl = row.querySelector('.row-text');
             if (textEl) textEl.textContent = newText;
         }
 
-        // Keep scrolling if auto-scroll is on
+        saveToLocalStorage(); // Save updates
         if (autoScrollTranscript) scrollToBottom(transcriptPanel);
     }
 
@@ -554,9 +558,9 @@
         transcriptData.push(item);
 
         const row = createTranscriptRow(item);
-        // Insert before interim box
         transcriptList.appendChild(row);
 
+        saveToLocalStorage(); // Save additions
         if (autoScrollTranscript) scrollToBottom(transcriptPanel);
     }
 
@@ -575,7 +579,6 @@
         const btn = document.createElement('button');
         btn.textContent = 'Add';
         btn.className = 'btn-primary btn-add';
-        // Use closure for click handler
         btn.onclick = () => addToSelected(item.id, btn);
 
         actionDiv.appendChild(btn);
@@ -590,7 +593,6 @@
         if (item && !item.added) {
             item.added = true;
             
-            // Visual feedback
             btn.textContent = 'Added';
             btn.disabled = true;
             btn.classList.remove('btn-primary');
@@ -599,9 +601,9 @@
             const row = document.getElementById(`row-${id}`);
             if(row) row.classList.add('row-added');
 
-            // Add to selected list
             selectedData.push({ id: item.id, text: item.text });
             renderSelectedRow(item.text);
+            saveToLocalStorage(); // Save selection changes
         }
     }
 
@@ -635,10 +637,9 @@
         el.scrollTop = el.scrollHeight;
     }
 
-    // Detect user scrolling to pause auto-scroll
     transcriptPanel.addEventListener('scroll', () => {
         const dist = transcriptPanel.scrollHeight - (transcriptPanel.scrollTop + transcriptPanel.clientHeight);
-        autoScrollTranscript = (dist < 50); // Resume if close to bottom
+        autoScrollTranscript = (dist < 50);
     });
 
     // --- 6. Button Listeners ---
@@ -657,14 +658,15 @@
         if(!confirm("Clear transcript?")) return;
         transcriptData = [];
         transcriptList.innerHTML = '';
+        localStorage.removeItem('voiceNotes_transcript'); // Clear Storage
     });
 
     btnClearS.addEventListener('click', () => {
         if(!confirm("Clear selected notes?")) return;
         selectedData = [];
         selectedList.innerHTML = '';
+        localStorage.removeItem('voiceNotes_selected'); // Clear Storage
         
-        // Reset transcript UI to allow re-adding
         transcriptData.forEach(t => t.added = false);
         const rows = transcriptList.querySelectorAll('.row');
         rows.forEach(r => {
@@ -676,6 +678,7 @@
                 b.className = 'btn-primary btn-add';
             }
         });
+        saveToLocalStorage(); // Update transcript storage (removed 'added' flags)
     });
 
     btnCopy.addEventListener('click', () => {
@@ -694,6 +697,9 @@
             }, 1500);
         }).catch(err => alert('Copy failed: ' + err));
     });
+
+    // Load data on startup
+    loadFromLocalStorage();
 
 </script>
 </body>
