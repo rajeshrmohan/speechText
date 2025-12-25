@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Speech to Text App</title>
+<title>Voice Notes</title>
 <style>
     :root {
         --bg-color: #f4f4f9;
@@ -15,8 +15,6 @@
         --text-main: #333;
         --text-muted: #777;
         --border: #ddd;
-        --header-height: 130px; /* Approx height of header + controls */
-        --footer-height: 100px;
     }
 
     * {
@@ -33,7 +31,7 @@
         height: 100vh;
         display: flex;
         flex-direction: column;
-        overflow: hidden; /* Prevent body scroll, handle inside panels */
+        overflow: hidden;
     }
 
     /* === HEADER === */
@@ -43,69 +41,79 @@
         border-bottom: 1px solid var(--border);
         flex-shrink: 0;
         z-index: 10;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
 
     .app-title-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
     }
 
     h1 {
         margin: 0;
-        font-size: 1.2rem;
+        font-size: 1.25rem;
         color: var(--primary-dark);
+        font-weight: 700;
     }
 
     #status {
-        font-size: 0.9rem;
-        font-weight: bold;
-        padding: 4px 8px;
-        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 12px;
         background: #eee;
+        color: #555;
+        letter-spacing: 0.5px;
     }
 
     .controls-row {
         display: flex;
-        gap: 10px;
+        gap: 8px;
         align-items: center;
     }
 
     select {
-        flex: 1;
+        flex: 1; /* Takes remaining space */
         height: 44px;
-        padding: 0 10px;
-        font-size: 1rem;
+        padding: 0 30px 0 10px; /* Space for arrow */
+        font-size: 0.95rem;
         border: 1px solid var(--border);
-        border-radius: 4px;
-        background: white;
+        border-radius: 6px;
+        background-color: white;
+        color: #333;
     }
 
     /* === BUTTONS === */
     button {
-        height: 44px; /* Touch target size */
+        height: 44px;
         border: none;
-        border-radius: 4px;
-        font-size: 1rem;
-        font-weight: 500;
-        padding: 0 15px;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 0 16px;
         cursor: pointer;
-        transition: background 0.2s;
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        transition: all 0.2s ease;
     }
 
     button:disabled {
-        opacity: 0.5;
+        opacity: 0.6;
         cursor: not-allowed;
+        filter: grayscale(0.5);
     }
 
+    button:active {
+        transform: scale(0.98);
+    }
+
+    .btn-success { background: var(--success); color: white; min-width: 70px; }
+    .btn-danger { background: var(--danger); color: white; min-width: 70px; }
     .btn-primary { background: var(--primary); color: white; }
-    .btn-success { background: var(--success); color: white; }
-    .btn-danger { background: var(--danger); color: white; }
-    .btn-outline { background: transparent; border: 1px solid var(--text-muted); color: var(--text-muted); font-size: 0.9rem; }
+    .btn-outline { background: white; border: 1px solid #ccc; color: #555; }
 
     /* === MAIN CONTENT (PANELS) === */
     main {
@@ -113,8 +121,8 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        padding: 10px;
-        gap: 10px;
+        padding: 8px;
+        gap: 8px;
     }
 
     .panel {
@@ -125,20 +133,18 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
 
     .panel-header {
-        padding: 8px 12px;
-        background: #fafafa;
+        padding: 10px 12px;
+        background: #f8f9fa;
         border-bottom: 1px solid var(--border);
-        font-weight: bold;
-        color: var(--text-muted);
-        font-size: 0.85rem;
+        font-weight: 700;
+        color: #666;
+        font-size: 0.8rem;
         text-transform: uppercase;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        letter-spacing: 0.5px;
     }
 
     .panel-content {
@@ -146,26 +152,28 @@
         overflow-y: auto;
         padding: 0;
         scroll-behavior: smooth;
+        position: relative;
     }
 
-    /* === TRANSCRIPT LIST === */
+    /* === TRANSCRIPT ROWS === */
     .row {
         display: flex;
         align-items: flex-start;
         padding: 12px;
-        border-bottom: 1px solid #eee;
-        animation: fadeIn 0.3s ease;
+        border-bottom: 1px solid #f0f0f0;
+        animation: slideIn 0.2s ease-out;
     }
 
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
     .row-text {
         flex: 1;
-        padding-right: 10px;
+        padding-right: 12px;
         font-size: 1.05rem;
-        line-height: 1.4;
-        word-wrap: break-word;
-        user-select: text;
+        line-height: 1.5;
+        color: #333;
+        word-wrap: break-word; /* Prevents overflow */
+        min-width: 0; /* Flexbox text wrap fix */
     }
 
     .row-action {
@@ -173,17 +181,18 @@
     }
 
     .row-added {
-        background-color: #f9f9f9;
+        background-color: #fafafa;
     }
     .row-added .row-text {
-        color: #999;
+        color: #aaa;
         text-decoration: line-through;
     }
 
     .btn-add {
-        font-size: 0.85rem;
-        height: 36px;
-        padding: 0 12px;
+        font-size: 0.8rem;
+        height: 34px;
+        padding: 0 14px;
+        border-radius: 17px;
     }
 
     /* === INTERIM TEXT === */
@@ -191,8 +200,9 @@
         padding: 12px;
         font-style: italic;
         color: var(--primary);
-        border-bottom: 1px solid #eee;
-        display: none; /* Hidden when empty */
+        background: #fdfdfd;
+        border-bottom: 1px solid #f0f0f0;
+        display: none;
     }
     #interimBox.active {
         display: block;
@@ -206,13 +216,12 @@
         flex-shrink: 0;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 10px;
     }
 
     .footer-actions {
         display: flex;
-        gap: 10px;
-        justify-content: space-between;
+        gap: 8px;
     }
     
     .footer-actions button {
@@ -222,51 +231,34 @@
 
     .privacy-note {
         text-align: center;
-        font-size: 0.75rem;
-        color: var(--text-muted);
-        margin-top: 5px;
+        font-size: 0.7rem;
+        color: #999;
     }
 
-    /* Overlay for unsupported */
+    /* === UNSUPPORTED OVERLAY === */
     #unsupported {
         position: fixed;
         top: 0; left: 0; width: 100%; height: 100%;
         background: white;
-        z-index: 1000;
+        z-index: 9999;
         display: none;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         text-align: center;
-        padding: 20px;
+        padding: 30px;
     }
-
-    /* Panel specific scroll hint */
-    .scroll-paused {
-        position: absolute;
-        bottom: 10px;
-        right: 10px;
-        background: rgba(0,0,0,0.6);
-        color: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 0.8rem;
-        pointer-events: none;
-        opacity: 0;
-        transition: opacity 0.3s;
-    }
-    .panel:hover .scroll-paused.visible {
-        opacity: 1;
-    }
+    #unsupported h2 { color: var(--danger); margin-bottom: 10px; }
 
 </style>
 </head>
 <body>
 
+<!-- Overlay for non-Chrome browsers -->
 <div id="unsupported">
     <h2>Browser Not Supported</h2>
-    <p>This app requires the Web Speech API.</p>
-    <p>Please use <strong>Google Chrome on Android</strong> or Desktop.</p>
+    <p>This app relies on the <strong>Web Speech API</strong>.</p>
+    <p style="margin-top:20px;">Please use <br><strong>Chrome on Android</strong><br>or Chrome Desktop.</p>
 </div>
 
 <header>
@@ -281,6 +273,8 @@
             <option value="en-SG">English (SG)</option>
             <option value="en-US">English (US)</option>
             <option value="zh-SG">Chinese (SG)</option>
+            <option value="ms-MY">Malay</option>
+            <option value="ta-IN">Tamil</option>
         </select>
     </div>
 </header>
@@ -288,20 +282,16 @@
 <main>
     <!-- Panel A: Transcript -->
     <div class="panel">
-        <div class="panel-header">
-            <span>Transcript</span>
-        </div>
+        <div class="panel-header">Transcript</div>
         <div class="panel-content" id="transcriptPanel">
-            <div id="interimBox"></div>
             <div id="transcriptList"></div>
+            <div id="interimBox"></div>
         </div>
     </div>
 
     <!-- Panel B: Selected -->
     <div class="panel">
-        <div class="panel-header">
-            <span>Selected</span>
-        </div>
+        <div class="panel-header">Selected</div>
         <div class="panel-content" id="selectedPanel">
             <div id="selectedList"></div>
         </div>
@@ -312,23 +302,25 @@
     <div class="footer-actions">
         <button id="btnClearT" class="btn-outline">Clear T</button>
         <button id="btnClearS" class="btn-outline">Clear S</button>
-        <button id="btnCopy" class="btn-primary">Copy Selected</button>
+        <button id="btnCopy" class="btn-primary">Copy All</button>
     </div>
     <div class="privacy-note">
-        Runs locally in your browser. No audio is uploaded.
+        Runs locally in your browser. No audio is sent to the server.
     </div>
 </footer>
 
 <script>
-    // --- 1. Variables & State ---
+    // --- 1. Variables ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition;
     let isListening = false;
-    let shouldBeListening = false; // Flag for manual stop vs error stop
+    let shouldBeListening = false; // Intended state
     let autoScrollTranscript = true;
-    let transcriptData = []; // {id, text, added}
-    let selectedData = [];   // {id, text}
     let nextId = 1;
+
+    // Data Models
+    let transcriptData = []; // Array of { id, text, added (bool) }
+    let selectedData = [];   // Array of { id, text }
 
     // DOM Elements
     const statusEl = document.getElementById('status');
@@ -337,34 +329,32 @@
     const transcriptPanel = document.getElementById('transcriptPanel');
     const selectedList = document.getElementById('selectedList');
     const selectedPanel = document.getElementById('selectedPanel');
-    
-    // Controls
     const btnStart = document.getElementById('btnStart');
     const btnStop = document.getElementById('btnStop');
     const langSelect = document.getElementById('langSelect');
-    
-    // Actions
     const btnClearT = document.getElementById('btnClearT');
     const btnClearS = document.getElementById('btnClearS');
     const btnCopy = document.getElementById('btnCopy');
 
-    // --- 2. Initialization ---
+    // --- 2. Check Support ---
     if (!SpeechRecognition) {
         document.getElementById('unsupported').style.display = 'flex';
     } else {
         initRecognition();
     }
 
+    // --- 3. Speech Recognition Logic ---
     function initRecognition() {
         recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
         recognition.lang = langSelect.value;
 
         recognition.onstart = () => {
             isListening = true;
-            statusEl.textContent = 'Listening...';
-            statusEl.style.backgroundColor = '#d4edda'; // Light green
+            statusEl.textContent = 'Listening';
+            statusEl.style.backgroundColor = '#d4edda';
             statusEl.style.color = '#155724';
             btnStart.disabled = true;
             btnStop.disabled = false;
@@ -372,115 +362,125 @@
         };
 
         recognition.onerror = (event) => {
-            console.error("Speech Error:", event.error);
+            if (event.error === 'no-speech') return; // Ignore silence
+            
+            console.error('Speech Error:', event.error);
             if (event.error === 'not-allowed') {
-                statusEl.textContent = 'No Permission';
+                statusEl.textContent = 'Denied';
                 statusEl.style.backgroundColor = '#f8d7da';
                 statusEl.style.color = '#721c24';
                 shouldBeListening = false;
-            } else if (event.error === 'no-speech') {
-                // Ignore no-speech, just stay listening usually
             } else {
-                statusEl.textContent = 'Error: ' + event.error;
+                statusEl.textContent = 'Error';
             }
         };
 
         recognition.onend = () => {
             isListening = false;
+            // Android Chrome often stops automatically. Restart if we didn't press Stop.
             if (shouldBeListening) {
-                // Attempt restart if we didn't manually stop
-                // Android Chrome sometimes stops automatically
                 try {
                     recognition.start();
                 } catch (e) {
-                    resetUIState();
+                    // Start might fail if already started or denied
+                    setTimeout(() => { if(shouldBeListening) recognition.start(); }, 100);
                 }
             } else {
-                resetUIState();
+                resetUI();
             }
         };
 
         recognition.onresult = (event) => {
-            let finalTranscript = '';
             let interimTranscript = '';
+            let finalTranscript = '';
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
+                const result = event.results[i];
+                if (result.isFinal) {
+                    finalTranscript += result[0].transcript;
                 } else {
-                    interimTranscript += event.results[i][0].transcript;
+                    interimTranscript += result[0].transcript;
                 }
             }
 
-            // Handle Interim
+            // --- UI Update: Interim ---
             if (interimTranscript) {
                 interimBox.textContent = interimTranscript;
                 interimBox.classList.add('active');
-                if(autoScrollTranscript) scrollToBottom(transcriptPanel);
+                // Move interim box to the bottom of the list visually
+                transcriptPanel.appendChild(interimBox); 
+                if (autoScrollTranscript) scrollToBottom(transcriptPanel);
             } else {
                 interimBox.textContent = '';
                 interimBox.classList.remove('active');
             }
 
-            // Handle Final
+            // --- UI Update: Final ---
             if (finalTranscript) {
-                finalTranscript = finalTranscript.trim();
-                if(finalTranscript.length > 0) {
-                    addTranscriptItem(finalTranscript);
-                }
+                handleFinalResult(finalTranscript.trim());
             }
         };
     }
 
-    function resetUIState() {
-        isListening = false;
-        shouldBeListening = false;
-        statusEl.textContent = 'Stopped';
-        statusEl.style.backgroundColor = '#eee';
-        statusEl.style.color = '#333';
-        btnStart.disabled = false;
-        btnStop.disabled = true;
-        langSelect.disabled = false;
+    // --- 4. Result Processing (The Fix) ---
+    function handleFinalResult(text) {
+        if (!text) return;
+
+        // Get the last item to check for the Android "growing text" bug
+        // Bug pattern: "is" -> "is that" -> "is that so" (all marked final sequentially)
+        const lastItem = transcriptData.length > 0 ? transcriptData[transcriptData.length - 1] : null;
+
+        if (lastItem && !lastItem.added) {
+            // Check for prefix match (Case insensitive)
+            const cleanText = text.toLowerCase();
+            const cleanLast = lastItem.text.toLowerCase();
+
+            // 1. Exact duplicate? Ignore.
+            if (cleanText === cleanLast) return;
+
+            // 2. Is this an extension of the previous line? (Android Bug Fix)
+            // If new text starts with the old text, we UPDATE the old row instead of adding new.
+            if (cleanText.startsWith(cleanLast) && cleanText.length > cleanLast.length) {
+                updateTranscriptItem(lastItem.id, text);
+                return;
+            }
+        }
+
+        // Otherwise, add as new row
+        addTranscriptItem(text);
     }
 
-    // --- 3. Core Logic ---
-
-    // Start Button
-    btnStart.addEventListener('click', () => {
-        shouldBeListening = true;
-        recognition.lang = langSelect.value;
-        try {
-            recognition.start();
-        } catch(e) {
-            console.error(e);
-        }
-    });
-
-    // Stop Button
-    btnStop.addEventListener('click', () => {
-        shouldBeListening = false;
-        recognition.stop();
-    });
-
-    // Add Transcript Item
     function addTranscriptItem(text) {
         const id = nextId++;
         const item = { id, text, added: false };
         transcriptData.push(item);
 
         const row = createTranscriptRow(item);
+        // Insert before interim box
         transcriptList.appendChild(row);
 
-        if (autoScrollTranscript) {
-            scrollToBottom(transcriptPanel);
-        }
+        if (autoScrollTranscript) scrollToBottom(transcriptPanel);
     }
 
-    // Create HTML for Transcript Row
+    function updateTranscriptItem(id, newText) {
+        // Update Data
+        const item = transcriptData.find(d => d.id === id);
+        if (item) item.text = newText;
+
+        // Update DOM
+        const row = document.getElementById(`row-${id}`);
+        if (row) {
+            const textEl = row.querySelector('.row-text');
+            if (textEl) textEl.textContent = newText;
+        }
+
+        if (autoScrollTranscript) scrollToBottom(transcriptPanel);
+    }
+
     function createTranscriptRow(item) {
         const div = document.createElement('div');
         div.className = 'row';
-        div.id = `t-row-${item.id}`;
+        div.id = `row-${item.id}`;
 
         const textDiv = document.createElement('div');
         textDiv.className = 'row-text';
@@ -492,7 +492,8 @@
         const btn = document.createElement('button');
         btn.textContent = 'Add';
         btn.className = 'btn-primary btn-add';
-        btn.onclick = () => handleAddClick(item.id, btn);
+        // Use closure for click handler
+        btn.onclick = () => addToSelected(item.id, btn);
 
         actionDiv.appendChild(btn);
         div.appendChild(textDiv);
@@ -501,115 +502,114 @@
         return div;
     }
 
-    // Handle "Add" Click
-    function handleAddClick(id, btnElement) {
+    function addToSelected(id, btn) {
         const item = transcriptData.find(d => d.id === id);
         if (item && !item.added) {
-            // Update data
             item.added = true;
-            selectedData.push({ id: item.id, text: item.text });
-
-            // Update UI
-            const row = document.getElementById(`t-row-${id}`);
-            row.classList.add('row-added');
             
-            btnElement.textContent = 'Added';
-            btnElement.disabled = true;
-            btnElement.className = 'btn-outline btn-add';
+            // Visual feedback
+            btn.textContent = 'Added';
+            btn.disabled = true;
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-outline');
+            
+            const row = document.getElementById(`row-${id}`);
+            if(row) row.classList.add('row-added');
 
-            // Render Selected
-            addSelectedRow(item);
+            // Add to selected list
+            selectedData.push({ id: item.id, text: item.text });
+            renderSelectedRow(item.text);
         }
     }
 
-    // Add Row to Selected Panel
-    function addSelectedRow(item) {
+    function renderSelectedRow(text) {
         const div = document.createElement('div');
         div.className = 'row';
+        div.style.borderBottom = "1px solid #eee";
         
         const textDiv = document.createElement('div');
         textDiv.className = 'row-text';
-        textDiv.textContent = item.text;
-
+        textDiv.textContent = text;
+        
         div.appendChild(textDiv);
         selectedList.appendChild(div);
         
-        // Always scroll selected to bottom
         scrollToBottom(selectedPanel);
     }
 
-    // Scroll Helper
-    function scrollToBottom(element) {
-        element.scrollTop = element.scrollHeight;
+    // --- 5. Utilities & UI ---
+    function resetUI() {
+        isListening = false;
+        statusEl.textContent = 'Stopped';
+        statusEl.style.backgroundColor = '#eee';
+        statusEl.style.color = '#555';
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        langSelect.disabled = false;
     }
 
-    // Scroll Detection (User manual scroll)
+    function scrollToBottom(el) {
+        el.scrollTop = el.scrollHeight;
+    }
+
+    // Detect user scrolling to pause auto-scroll
     transcriptPanel.addEventListener('scroll', () => {
-        const threshold = 50;
-        const position = transcriptPanel.scrollTop + transcriptPanel.clientHeight;
-        const height = transcriptPanel.scrollHeight;
-
-        // If user is close to bottom, enable auto-scroll, else disable
-        if (height - position < threshold) {
-            autoScrollTranscript = true;
-        } else {
-            autoScrollTranscript = false;
-        }
+        const dist = transcriptPanel.scrollHeight - (transcriptPanel.scrollTop + transcriptPanel.clientHeight);
+        autoScrollTranscript = (dist < 50); // Resume if close to bottom
     });
 
-    // --- 4. Footer Actions ---
+    // --- 6. Button Listeners ---
+    btnStart.addEventListener('click', () => {
+        shouldBeListening = true;
+        recognition.lang = langSelect.value;
+        try { recognition.start(); } catch(e) {}
+    });
 
-    // Clear Transcript
+    btnStop.addEventListener('click', () => {
+        shouldBeListening = false;
+        recognition.stop();
+    });
+
     btnClearT.addEventListener('click', () => {
-        if(confirm("Clear all transcript history?")) {
-            transcriptData = [];
-            transcriptList.innerHTML = '';
-            // Reset ID doesn't strictly matter but keeps it clean
-        }
+        if(!confirm("Clear transcript?")) return;
+        transcriptData = [];
+        transcriptList.innerHTML = '';
     });
 
-    // Clear Selected
     btnClearS.addEventListener('click', () => {
-        if(confirm("Clear selected notes?")) {
-            selectedData = [];
-            selectedList.innerHTML = '';
-            
-            // Reset buttons in transcript
-            transcriptData.forEach(item => {
-                item.added = false;
-                const row = document.getElementById(`t-row-${item.id}`);
-                if (row) {
-                    row.classList.remove('row-added');
-                    const btn = row.querySelector('button');
-                    btn.textContent = 'Add';
-                    btn.disabled = false;
-                    btn.className = 'btn-primary btn-add';
-                }
-            });
-        }
+        if(!confirm("Clear selected notes?")) return;
+        selectedData = [];
+        selectedList.innerHTML = '';
+        
+        // Reset transcript UI to allow re-adding
+        transcriptData.forEach(t => t.added = false);
+        const rows = transcriptList.querySelectorAll('.row');
+        rows.forEach(r => {
+            r.classList.remove('row-added');
+            const b = r.querySelector('button');
+            if(b) {
+                b.textContent = 'Add';
+                b.disabled = false;
+                b.className = 'btn-primary btn-add';
+            }
+        });
     });
 
-    // Copy Selected
-    btnCopy.addEventListener('click', async () => {
+    btnCopy.addEventListener('click', () => {
         if (selectedData.length === 0) return;
+        const textToCopy = selectedData.map(d => d.text).join('\n');
         
-        const allText = selectedData.map(i => i.text).join('\n');
-        
-        try {
-            await navigator.clipboard.writeText(allText);
-            const originalText = btnCopy.textContent;
-            btnCopy.textContent = "Copied!";
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            const original = btnCopy.textContent;
+            btnCopy.textContent = 'Copied!';
             btnCopy.classList.remove('btn-primary');
             btnCopy.classList.add('btn-success');
-            
             setTimeout(() => {
-                btnCopy.textContent = originalText;
+                btnCopy.textContent = original;
                 btnCopy.classList.remove('btn-success');
                 btnCopy.classList.add('btn-primary');
-            }, 2000);
-        } catch (err) {
-            alert('Failed to copy: ' + err);
-        }
+            }, 1500);
+        }).catch(err => alert('Copy failed: ' + err));
     });
 
 </script>
