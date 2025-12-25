@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SpeechNote</title>
+    
+    <!-- PWA / Mobile App Installation Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SpeechNote">
+    <meta name="theme-color" content="#2563eb">
+
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --success-color: #16a34a;
+            --danger-color: #dc2626;
+            --bg-color: #f8fafc;
+            --surface-color: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #cbd5e1;
+            --muted-text: #64748b;
+            --spacing-unit: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Prevent body scroll, handle inside panels */
+            /* Prevent pull-to-refresh on mobile which can interfere with web apps */
+            overscroll-behavior-y: none;
+        }
+
+        /* --- Header --- */
+        header {
+            background-color: var(--surface-color);
+            padding: var(--spacing-unit);
+            padding-top: max(var(--spacing-unit), env(safe-area-inset-top));
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        #status-indicator {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--muted-text);
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: #f1f5f9;
+        }
+
+        #status-indicator.listening { color: var(--primary-color); background-color: #dbeafe; }
+        #status-indicator.error { color: var(--danger-color); background-color: #fee2e2; }
+        #status-indicator.no-permission { color: #b91c1c; background-color: #fecaca; }
+
+        /* --- Controls --- */
+        .controls {
+            padding: var(--spacing-unit);
+            background-color: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-unit);
+            align-items: center;
+        }
+
+        .language-select {
+            grid-column: 1 / -1;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+            background-color: var(--bg-color);
+        }
+
+        button {
+            height: 48px; /* Touch target size */
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #btn-start {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        #btn-stop {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+        
+        #btn-stop.active {
+            background-color: var(--danger-color);
+            color: white;
+            border-color: var(--danger-color);
+        }
+
+        /* --- Live Preview --- */
+        #live-box {
+            background-color: #fffbeb; /* Light yellow for interim */
+            color: #b45309;
+            padding: 8px var(--spacing-unit);
+            min-height: 36px;
+            font-style: italic;
+            font-size: 0.95rem;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        #live-text:empty::before {
+            content: "Listening...";
+            opacity: 0.5;
+        }
+
+        /* --- Main Panels Container --- */
+        .panels-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Important for independent scrolling */
+            background-color: var(--bg-color);
+        }
+
+        .panel-header {
+            padding: 8px var(--spacing-unit);
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--muted-text);
+            background-color: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .scroll-panel {
+            flex: 1; /* Distribute space equally */
+            overflow-y: auto;
+            padding: var(--spacing-unit);
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Transcript Styling */
+        .transcript-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            /* Flex column reversed is an alternative, but prepend is used here for JS simplicity */
+        }
+
+        .transcript-row {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .transcript-row.added {
+            border-color: var(--success-color);
+            background-color: #f0fdf4;
+        }
+
+        .transcript-text {
+            flex-grow: 1;
+            font-size: 1rem;
+            line-height: 1.4;
+            word-break: break-word;
+            user-select: text;
+        }
+
+        .btn-add {
+            flex-shrink: 0;
+            padding: 6px 12px;
+            height: auto;
+            min-height: 36px;
+            font-size: 0.85rem;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 4px;
+        }
+
+        .btn-add:disabled {
+            background-color: var(--success-color);
+            cursor: default;
+        }
+
+        /* Selected Styling */
+        .selected-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .selected-item {
+            background-color: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px;
+            font-size: 0.95rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .selected-item:last-child { border-bottom: none; }
+        .selected-ts { font-size: 0.75rem; color: var(--muted-text); margin-left: 8px; white-space: nowrap;}
+
+        /* --- Footer --- */
+        footer {
+            padding: var(--spacing-unit);
+            padding-bottom: max(var(--spacing-unit), env(safe-area-inset-bottom));
+            background-color: var(--surface-color);
+            border-top: 1px solid var(--border-color);
+            flex-shrink: 0;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .footer-btn {
+            flex: 1;
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            font-size: 0.85rem;
+            height: 40px;
+        }
+
+        #btn-copy {
+            background-color: var(--text-color);
+            color: white;
+            border-color: var(--text-color);
+        }
+
+        .privacy-note {
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--muted-text);
+            padding: 4px;
+            flex-basis: 100%;
+        }
+
+        /* --- Utilities --- */
+        .hidden { display: none !important; }
+
+        @media (min-width: 768px) {
+            .panels-container {
+                flex-direction: row;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- PWA Setup Script (Runs immediately) -->
+<script>
+    (function() {
+        // 1. Generate a simple Icon using Canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        // Background
+        ctx.fillStyle = '#2563eb';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Microphone Icon
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        // Mic body
+        ctx.roundRect(176, 128, 160, 256, 80);
+        ctx.fill();
+        // Mic stand base
+        ctx.fillRect(236, 400, 40, 50);
+        // Mic stand foot
+        ctx.beginPath();
+        ctx.arc(256, 460, 60, 0, Math.PI, true);
+        ctx.fill();
+
+        const iconUrl = canvas.toDataURL('image/png');
+
+        // 2. Create Manifest Object
+        const manifest = {
+            "name": "SpeechNote",
+            "short_name": "SpeechNote",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#f8fafc",
+            "theme_color": "#2563eb",
+            "icons": [
+                {
+                    "src": iconUrl,
+                    "sizes": "512x512",
+                    "type": "image/png"
+                }
+            ]
+        };
+
+        // 3. Inject Manifest Link
+        const stringManifest = JSON.stringify(manifest);
+        const blobManifest = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blobManifest);
+        
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestURL;
+        document.head.appendChild(link);
+
+        // 4. Register a "Dummy" Service Worker to satisfy Chrome Install Criteria
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', (e) => self.skipWaiting());
+                self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
+                self.addEventListener('fetch', (e) => {
+                    // Network only strategy
+                    e.respondWith(fetch(e.request));
+                });
+            `;
+            const blobSW = new Blob([swCode], {type: 'application/javascript'});
+            const swURL = URL.createObjectURL(blobSW);
+            
+            navigator.serviceWorker.register(swURL)
+                .then(() => console.log('SW Registered'))
+                .catch((err) => console.log('SW Registration failed', err));
+        }
+    })();
+</script>
+
+<header>
+    <h1>SpeechNote</h1>
+    <span id="status-indicator" aria-live="polite">Idle</span>
+</header>
+
+<main>
+    <div class="controls">
+        <select id="lang-select" class="language-select" aria-label="Select Language">
+            <option value="en-SG" selected>English (Singapore)</option>
+            <option value="en-US">English (US)</option>
+            <option value="zh-SG">Chinese (Singapore)</option>
+        </select>
+        <button id="btn-start">Start</button>
+        <button id="btn-stop" disabled>Stop</button>
+    </div>
+
+    <div id="live-box">
+        <span id="live-text"></span>
+    </div>
+
+    <div class="panels-container">
+        <!-- Panel A: Transcript -->
+        <div style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+            <div class="panel-header">Transcript</div>
+            <div id="transcript-panel" class="scroll-panel">
+                <ul id="transcript-list" class="transcript-list">
+                    <!-- Entries go here -->
+                </ul>
+                <div id="empty-transcript-msg" style="text-align: center; color: var(--muted-text); margin-top: 20px;">
+                    Waiting for speech...
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel B: Selected -->
+        <div style="display: flex; flex-direction: column; flex: 1; min-height: 0; border-top: 4px solid var(--bg-color);">
+            <div class="panel-header">Selected</div>
+            <div id="selected-panel" class="scroll-panel">
+                <ul id="selected-list" class="selected-list">
+                    <!-- Selected entries go here -->
+                </ul>
+                <div id="empty-selected-msg" style="text-align: center; color: var(--muted-text); margin-top: 20px;">
+                    No items added yet.
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer>
+    <button id="btn-clear-transcript" class="footer-btn">Clear Transcript</button>
+    <button id="btn-clear-selected" class="footer-btn">Clear Selected</button>
+    <button id="btn-copy" class="footer-btn">Copy Selected</button>
+    <div class="privacy-note">Runs locally in your browser. No audio is uploaded.</div>
+</footer>
+
+<script>
+    /**
+     * App State
+     */
+    const state = {
+        transcriptData: [], // { id, text, ts, added }
+        selectedData: [],   // { id, text, ts }
+        nextId: 1,
+        isListening: false,
+        lang: 'en-SG',
+        autoScrollTop: true // Changed from autoScrollEnabled to autoScrollTop
+    };
+
+    /**
+     * DOM Elements
+     */
+    const els = {
+        status: document.getElementById('status-indicator'),
+        langSelect: document.getElementById('lang-select'),
+        btnStart: document.getElementById('btn-start'),
+        btnStop: document.getElementById('btn-stop'),
+        liveText: document.getElementById('live-text'),
+        transcriptPanel: document.getElementById('transcript-panel'),
+        transcriptList: document.getElementById('transcript-list'),
+        emptyTranscriptMsg: document.getElementById('empty-transcript-msg'),
+        selectedPanel: document.getElementById('selected-panel'),
+        selectedList: document.getElementById('selected-list'),
+        emptySelectedMsg: document.getElementById('empty-selected-msg'),
+        btnClearTranscript: document.getElementById('btn-clear-transcript'),
+        btnClearSelected: document.getElementById('btn-clear-selected'),
+        btnCopy: document.getElementById('btn-copy')
+    };
+
+    /**
+     * Web Speech API Setup
+     */
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+
+    if (!SpeechRecognition) {
+        setStatus('not-supported');
+        els.btnStart.disabled = true;
+        els.langSelect.disabled = true;
+    } else {
+        initRecognition();
+    }
+
+    function initRecognition() {
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = state.lang;
+
+        recognition.onstart = () => {
+            state.isListening = true;
+            setStatus('listening');
+            els.btnStart.disabled = true;
+            els.btnStop.disabled = false;
+            els.btnStop.classList.add('active');
+        };
+
+        recognition.onend = () => {
+            if (state.isListening) {
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.error("Restart failed", e);
+                    stopListening();
+                }
+            } else {
+                stopListening();
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Speech recognition error", event.error);
+            if (event.error === 'not-allowed') {
+                setStatus('no-permission');
+                state.isListening = false;
+                els.btnStart.disabled = false;
+                els.btnStop.disabled = true;
+            } else if (event.error === 'no-speech') {
+                // Ignore
+            } else {
+                setStatus('error', event.error);
+            }
+        };
+
+        recognition.onresult = (event) => {
+            let interimTranscript = '';
+            let finalTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            els.liveText.textContent = interimTranscript || finalTranscript;
+
+            if (finalTranscript) {
+                addTranscriptEntry(finalTranscript.trim());
+                els.liveText.textContent = '';
+            }
+        };
+    }
+
+    /**
+     * Logic Functions
+     */
+
+    function startListening() {
+        if (!recognition) return;
+        state.lang = els.langSelect.value;
+        recognition.lang = state.lang;
+        
+        try {
+            recognition.start();
+        } catch (e) {
+            console.warn(e);
+        }
+    }
+
+    function stopListening() {
+        if (!recognition) return;
+        state.isListening = false;
+        recognition.stop();
+        
+        setStatus('stopped');
+        els.btnStart.disabled = false;
+        els.btnStop.disabled = true;
+        els.btnStop.classList.remove('active');
+        els.liveText.textContent = '';
+    }
+
+    function addTranscriptEntry(text) {
+        if (!text) return;
+
+        els.emptyTranscriptMsg.style.display = 'none';
+
+        const id = state.nextId++;
+        const entry = {
+            id: id,
+            text: text,
+            ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            added: false
+        };
+
+        state.transcriptData.unshift(entry); // Add to beginning of array
+        
+        // Create DOM elements
+        const li = document.createElement('li');
+        li.className = 'transcript-row';
+        li.id = `row-${id}`;
+        
+        const spanText = document.createElement('span');
+        spanText.className = 'transcript-text';
+        spanText.textContent = text;
+
+        const btnAdd = document.createElement('button');
+        btnAdd.className = 'btn-add';
+        btnAdd.textContent = 'Add';
+        btnAdd.onclick = () => addToSelected(id);
+
+        li.appendChild(spanText);
+        li.appendChild(btnAdd);
+        
+        // PREPEND instead of append to add to top
+        els.transcriptList.prepend(li);
+
+        autoScrollTranscript();
+    }
+
+    function addToSelected(id) {
+        const entry = state.transcriptData.find(e => e.id === id);
+        if (!entry || entry.added) return;
+
+        entry.added = true;
+        state.selectedData.push({
+            id: entry.id,
+            text: entry.text,
+            ts: entry.ts
+        });
+
+        const row = document.getElementById(`row-${id}`);
+        if (row) {
+            row.classList.add('added');
+            const btn = row.querySelector('.btn-add');
+            btn.disabled = true;
+            btn.textContent = 'Added';
+        }
+
+        renderSelectedPanel();
+    }
+
+    function renderSelectedPanel() {
+        els.selectedList.innerHTML = '';
+        
+        if (state.selectedData.length > 0) {
+            els.emptySelectedMsg.style.display = 'none';
+            // Displaying selected items chronologically (usually standard) or reverse?
+            // Let's keep selected items in order of addition (oldest added at top) for clarity.
+            state.selectedData.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'selected-item';
+                
+                const spanText = document.createElement('span');
+                spanText.textContent = item.text;
+                
+                const spanTs = document.createElement('span');
+                spanTs.className = 'selected-ts';
+                spanTs.textContent = item.ts;
+
+                li.appendChild(spanText);
+                li.appendChild(spanTs);
+                els.selectedList.appendChild(li);
+            });
+            autoScrollSelected();
+        } else {
+            els.emptySelectedMsg.style.display = 'block';
+        }
+    }
+
+    function setStatus(type, msg) {
+        els.status.className = '';
+        if (type === 'not-supported') {
+            els.status.textContent = 'Not supported in this browser. Use Chrome.';
+            els.status.classList.add('error');
+        } else if (type === 'listening') {
+            els.status.textContent = 'Listening...';
+            els.status.classList.add('listening');
+        } else if (type === 'stopped') {
+            els.status.textContent = 'Stopped';
+        } else if (type === 'no-permission') {
+            els.status.textContent = 'No Permission';
+            els.status.classList.add('no-permission');
+            alert('Microphone permission denied. Please allow access in your browser settings.');
+        } else if (type === 'error') {
+            els.status.textContent = 'Error: ' + (msg || 'Unknown');
+            els.status.classList.add('error');
+        } else {
+            els.status.textContent = 'Idle';
+        }
+    }
+
+    /**
+     * Scrolling Logic
+     */
+    function isNearTop(element) {
+        const threshold = 100; // pixels
+        return element.scrollTop < threshold;
+    }
+
+    function autoScrollTranscript() {
+        if (state.autoScrollTop) {
+            // Scroll to top (0) to see newest item
+            els.transcriptPanel.scrollTop = 0;
+        }
+    }
+
+    function autoScrollSelected() {
+        // Keep auto-scroll to bottom for selected list as standard
+        els.selectedPanel.scrollTop = els.selectedPanel.scrollHeight;
+    }
+
+    // Detect user scroll interaction on transcript panel
+    // If user scrolls DOWN (away from 0), we pause auto-scrolling to top
+    els.transcriptPanel.addEventListener('scroll', () => {
+        state.autoScrollTop = isNearTop(els.transcriptPanel);
+    });
+
+    /**
+     * Event Listeners
+     */
+    els.btnStart.addEventListener('click', startListening);
+    els.btnStop.addEventListener('click', stopListening);
+
+    els.langSelect.addEventListener('change', () => {
+        if (state.isListening) {
+            stopListening();
+            setTimeout(startListening, 100);
+        }
+    });
+
+    els.btnClearTranscript.addEventListener('click', () => {
+        state.transcriptData = [];
+        els.transcriptList.innerHTML = '';
+        els.emptyTranscriptMsg.style.display = 'block';
+    });
+
+    els.btnClearSelected.addEventListener('click', () => {
+        state.selectedData = [];
+        state.transcriptData.forEach(t => t.added = false);
+        const rows = els.transcriptList.querySelectorAll('.transcript-row');
+        rows.forEach(row => {
+            row.classList.remove('added');
+            const btn = row.querySelector('.btn-add');
+            btn.disabled = false;
+            btn.textContent = 'Add';
+        });
+        renderSelectedPanel();
+    });
+
+    els.btnCopy.addEventListener('click', () => {
+        if (state.selectedData.length === 0) return;
+        
+        const textToCopy = state.selectedData.map(item => item.text).join('\n');
+        
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => showToast('Copied to clipboard!'))
+                .catch(err => {
+                    console.error('Copy failed', err);
+                    fallbackCopy(textToCopy);
+                });
+        } else {
+            fallbackCopy(textToCopy);
+        }
+    });
+
+    function fallbackCopy(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";  
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            const successful = document.execCommand('copy');
+            if(successful) showToast('Copied to clipboard!');
+        } catch (err) {
+            console.error('Fallback copy failed', err);
+            showToast('Failed to copy');
+        }
+        document.body.removeChild(textArea);
+    }
+
+    function showToast(msg) {
+        const toast = document.createElement('div');
+        toast.textContent = msg;
+        toast.style.position = 'fixed';
+        toast.style.bottom = '80px';
+        toast.style.left = '50%';
+        toast.style.transform = 'translateX(-50%)';
+        toast.style.backgroundColor = 'rgba(0,0,0,0.8)';
+        toast.style.color = '#fff';
+        toast.style.padding = '8px 16px';
+        toast.style.borderRadius = '20px';
+        toast.style.fontSize = '0.9rem';
+        toast.style.zIndex = '1000';
+        
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.5s';
+            setTimeout(() => document.body.removeChild(toast), 500);
+        }, 2000);
+    }
+</script>
+</body>
+</html>
