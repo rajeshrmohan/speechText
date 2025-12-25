@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>SpeechNote</title>
     
     <!-- PWA / Mobile App Installation Meta Tags -->
@@ -35,12 +35,12 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
-            height: 100vh;
+            height: 100vh; /* Fallback */
+            height: 100dvh; /* Dynamic viewport height for mobile browsers */
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Prevent body scroll, handle inside panels */
-            /* Prevent pull-to-refresh on mobile which can interfere with web apps */
-            overscroll-behavior-y: none;
+            overflow: hidden; /* Prevent body scroll */
+            overscroll-behavior-y: contain; /* Prevent pull-to-refresh interfering */
         }
 
         /* --- Header --- */
@@ -53,6 +53,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            z-index: 20;
         }
 
         h1 {
@@ -68,6 +69,7 @@
             padding: 4px 8px;
             border-radius: 4px;
             background-color: #f1f5f9;
+            white-space: nowrap;
         }
 
         #status-indicator.listening { color: var(--primary-color); background-color: #dbeafe; }
@@ -84,6 +86,7 @@
             grid-template-columns: 1fr 1fr;
             gap: var(--spacing-unit);
             align-items: center;
+            z-index: 20;
         }
 
         .language-select {
@@ -93,6 +96,7 @@
             border-radius: 6px;
             font-size: 1rem;
             background-color: var(--bg-color);
+            appearance: none;
         }
 
         button {
@@ -139,7 +143,7 @@
             flex-shrink: 0;
         }
         #live-text:empty::before {
-            content: "Listening...";
+            content: "...";
             opacity: 0.5;
         }
 
@@ -148,13 +152,14 @@
             flex-grow: 1;
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Important for independent scrolling */
+            overflow: hidden; /* Critical for independent scrolling */
             background-color: var(--bg-color);
+            position: relative;
         }
 
         .panel-header {
             padding: 8px var(--spacing-unit);
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -169,16 +174,19 @@
         .scroll-panel {
             flex: 1; /* Distribute space equally */
             overflow-y: auto;
-            padding: var(--spacing-unit);
-            -webkit-overflow-scrolling: touch;
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            touch-action: pan-y; /* Allow vertical scrolling */
         }
 
         /* Transcript Styling */
         .transcript-list {
             list-style: none;
-            padding: 0;
+            padding: var(--spacing-unit);
             margin: 0;
-            /* Flex column reversed is an alternative, but prepend is used here for JS simplicity */
+            /* Ensure list items stack correctly */
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         .transcript-row {
@@ -186,12 +194,13 @@
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 10px;
-            margin-bottom: 10px;
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             gap: 10px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            /* Ensure row doesn't shrink on mobile */
+            min-width: 0; 
         }
 
         .transcript-row.added {
@@ -226,20 +235,23 @@
         /* Selected Styling */
         .selected-list {
             list-style: none;
-            padding: 0;
+            padding: var(--spacing-unit);
             margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
         }
 
         .selected-item {
             background-color: var(--surface-color);
-            border-bottom: 1px solid var(--border-color);
             padding: 10px;
             font-size: 0.95rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-radius: 4px;
         }
-        .selected-item:last-child { border-bottom: none; }
+        
         .selected-ts { font-size: 0.75rem; color: var(--muted-text); margin-left: 8px; white-space: nowrap;}
 
         /* --- Footer --- */
@@ -252,6 +264,7 @@
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
+            z-index: 20;
         }
 
         .footer-btn {
@@ -261,6 +274,7 @@
             color: var(--text-color);
             font-size: 0.85rem;
             height: 40px;
+            min-width: 0;
         }
 
         #btn-copy {
@@ -271,9 +285,9 @@
 
         .privacy-note {
             text-align: center;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--muted-text);
-            padding: 4px;
+            padding: 4px 0 0 0;
             flex-basis: 100%;
         }
 
@@ -289,77 +303,39 @@
 </head>
 <body>
 
-<!-- PWA Setup Script (Runs immediately) -->
+<!-- PWA Setup Script -->
 <script>
     (function() {
-        // 1. Generate a simple Icon using Canvas
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 512;
         const ctx = canvas.getContext('2d');
-        
-        // Background
         ctx.fillStyle = '#2563eb';
         ctx.fillRect(0, 0, 512, 512);
-        
-        // Microphone Icon
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        // Mic body
         ctx.roundRect(176, 128, 160, 256, 80);
         ctx.fill();
-        // Mic stand base
         ctx.fillRect(236, 400, 40, 50);
-        // Mic stand foot
         ctx.beginPath();
         ctx.arc(256, 460, 60, 0, Math.PI, true);
         ctx.fill();
-
         const iconUrl = canvas.toDataURL('image/png');
-
-        // 2. Create Manifest Object
         const manifest = {
-            "name": "SpeechNote",
-            "short_name": "SpeechNote",
-            "start_url": ".",
-            "display": "standalone",
-            "background_color": "#f8fafc",
-            "theme_color": "#2563eb",
-            "icons": [
-                {
-                    "src": iconUrl,
-                    "sizes": "512x512",
-                    "type": "image/png"
-                }
-            ]
+            "name": "SpeechNote", "short_name": "SpeechNote", "start_url": ".", "display": "standalone",
+            "background_color": "#f8fafc", "theme_color": "#2563eb",
+            "icons": [{ "src": iconUrl, "sizes": "512x512", "type": "image/png" }]
         };
-
-        // 3. Inject Manifest Link
         const stringManifest = JSON.stringify(manifest);
         const blobManifest = new Blob([stringManifest], {type: 'application/json'});
         const manifestURL = URL.createObjectURL(blobManifest);
-        
         const link = document.createElement('link');
         link.rel = 'manifest';
         link.href = manifestURL;
         document.head.appendChild(link);
-
-        // 4. Register a "Dummy" Service Worker to satisfy Chrome Install Criteria
         if ('serviceWorker' in navigator) {
-            const swCode = `
-                self.addEventListener('install', (e) => self.skipWaiting());
-                self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
-                self.addEventListener('fetch', (e) => {
-                    // Network only strategy
-                    e.respondWith(fetch(e.request));
-                });
-            `;
-            const blobSW = new Blob([swCode], {type: 'application/javascript'});
-            const swURL = URL.createObjectURL(blobSW);
-            
-            navigator.serviceWorker.register(swURL)
-                .then(() => console.log('SW Registered'))
-                .catch((err) => console.log('SW Registration failed', err));
+            const swCode = `self.addEventListener('install', (e) => self.skipWaiting()); self.addEventListener('activate', (e) => e.waitUntil(clients.claim())); self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request)); });`;
+            navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode], {type: 'application/javascript'}))).catch(() => {});
         }
     })();
 </script>
@@ -386,8 +362,8 @@
 
     <div class="panels-container">
         <!-- Panel A: Transcript -->
-        <div style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-            <div class="panel-header">Transcript</div>
+        <div style="display: flex; flex-direction: column; flex: 1; min-height: 0; border-right: 1px solid var(--border-color);">
+            <div class="panel-header">Transcript (Newest Top)</div>
             <div id="transcript-panel" class="scroll-panel">
                 <ul id="transcript-list" class="transcript-list">
                     <!-- Entries go here -->
@@ -399,7 +375,7 @@
         </div>
 
         <!-- Panel B: Selected -->
-        <div style="display: flex; flex-direction: column; flex: 1; min-height: 0; border-top: 4px solid var(--bg-color);">
+        <div style="display: flex; flex-direction: column; flex: 1; min-height: 0; background-color: #f1f5f9;">
             <div class="panel-header">Selected</div>
             <div id="selected-panel" class="scroll-panel">
                 <ul id="selected-list" class="selected-list">
@@ -417,7 +393,7 @@
     <button id="btn-clear-transcript" class="footer-btn">Clear Transcript</button>
     <button id="btn-clear-selected" class="footer-btn">Clear Selected</button>
     <button id="btn-copy" class="footer-btn">Copy Selected</button>
-    <div class="privacy-note">Runs locally in your browser. No audio is uploaded.</div>
+    <div class="privacy-note">Runs locally. No audio uploaded.</div>
 </footer>
 
 <script>
@@ -425,12 +401,13 @@
      * App State
      */
     const state = {
-        transcriptData: [], // { id, text, ts, added }
-        selectedData: [],   // { id, text, ts }
+        transcriptData: [],
+        selectedData: [],
         nextId: 1,
         isListening: false,
         lang: 'en-SG',
-        autoScrollTop: true // Changed from autoScrollEnabled to autoScrollTop
+        autoScrollTop: true,
+        sentenceBuffer: '' // Buffer to accumulate words into sentences
     };
 
     /**
@@ -475,6 +452,7 @@
 
         recognition.onstart = () => {
             state.isListening = true;
+            state.sentenceBuffer = ''; // Reset buffer
             setStatus('listening');
             els.btnStart.disabled = true;
             els.btnStop.disabled = false;
@@ -482,6 +460,12 @@
         };
 
         recognition.onend = () => {
+            // Flush any remaining buffer on stop
+            if (state.sentenceBuffer.trim().length > 0) {
+                addTranscriptEntry(state.sentenceBuffer.trim());
+                state.sentenceBuffer = '';
+            }
+
             if (state.isListening) {
                 try {
                     recognition.start();
@@ -520,11 +504,29 @@
                 }
             }
 
-            els.liveText.textContent = interimTranscript || finalTranscript;
-
+            // Handle Final Results (Accumulate into buffer)
             if (finalTranscript) {
-                addTranscriptEntry(finalTranscript.trim());
-                els.liveText.textContent = '';
+                state.sentenceBuffer += finalTranscript;
+                
+                // Check punctuation to determine if we should commit to the list
+                // This solves the "every word has an add button" issue
+                const trimmedBuffer = state.sentenceBuffer.trim();
+                const lastChar = trimmedBuffer.slice(-1);
+                const punctuation = ['.', '?', '!', '。', '？', '！'];
+                
+                // Also commit if buffer gets too long (arbitrary 150 chars) to avoid huge blocks
+                if (punctuation.includes(lastChar) || trimmedBuffer.length > 150) {
+                    addTranscriptEntry(trimmedBuffer);
+                    state.sentenceBuffer = ''; // Clear buffer
+                    // Live box shows just interim now
+                    els.liveText.textContent = interimTranscript ? interimTranscript : '';
+                } else {
+                    // Show accumulated buffer + interim in Live Box
+                    els.liveText.textContent = trimmedBuffer + (interimTranscript ? ' ' + interimTranscript : '');
+                }
+            } else if (interimTranscript) {
+                // Only interim, show buffer + interim
+                els.liveText.textContent = state.sentenceBuffer + (interimTranscript ? ' ' + interimTranscript : '');
             }
         };
     }
@@ -570,7 +572,7 @@
             added: false
         };
 
-        state.transcriptData.unshift(entry); // Add to beginning of array
+        state.transcriptData.unshift(entry);
         
         // Create DOM elements
         const li = document.createElement('li');
@@ -589,10 +591,18 @@
         li.appendChild(spanText);
         li.appendChild(btnAdd);
         
-        // PREPEND instead of append to add to top
+        // PREPEND to top
         els.transcriptList.prepend(li);
 
-        autoScrollTranscript();
+        // Scroll Logic
+        // If user is near top (scrollTop < threshold), keep snapping to top.
+        // If user has scrolled down, DO NOT snap back up, allowing them to read history.
+        if (state.autoScrollTop) {
+            // Use requestAnimationFrame to ensure DOM is painted before scrolling
+            requestAnimationFrame(() => {
+                els.transcriptPanel.scrollTop = 0;
+            });
+        }
     }
 
     function addToSelected(id) {
@@ -622,8 +632,6 @@
         
         if (state.selectedData.length > 0) {
             els.emptySelectedMsg.style.display = 'none';
-            // Displaying selected items chronologically (usually standard) or reverse?
-            // Let's keep selected items in order of addition (oldest added at top) for clarity.
             state.selectedData.forEach(item => {
                 const li = document.createElement('li');
                 li.className = 'selected-item';
@@ -639,7 +647,8 @@
                 li.appendChild(spanTs);
                 els.selectedList.appendChild(li);
             });
-            autoScrollSelected();
+            // Always auto-scroll selected to bottom (newest at bottom of list is standard)
+            els.selectedPanel.scrollTop = els.selectedPanel.scrollHeight;
         } else {
             els.emptySelectedMsg.style.display = 'block';
         }
@@ -671,25 +680,14 @@
      * Scrolling Logic
      */
     function isNearTop(element) {
-        const threshold = 100; // pixels
+        // Allow user to scroll down 150px before we consider them "reading history"
+        const threshold = 150;
         return element.scrollTop < threshold;
     }
 
-    function autoScrollTranscript() {
-        if (state.autoScrollTop) {
-            // Scroll to top (0) to see newest item
-            els.transcriptPanel.scrollTop = 0;
-        }
-    }
-
-    function autoScrollSelected() {
-        // Keep auto-scroll to bottom for selected list as standard
-        els.selectedPanel.scrollTop = els.selectedPanel.scrollHeight;
-    }
-
     // Detect user scroll interaction on transcript panel
-    // If user scrolls DOWN (away from 0), we pause auto-scrolling to top
     els.transcriptPanel.addEventListener('scroll', () => {
+        // If user scrolled away from top, pause auto-scroll
         state.autoScrollTop = isNearTop(els.transcriptPanel);
     });
 
@@ -710,6 +708,7 @@
         state.transcriptData = [];
         els.transcriptList.innerHTML = '';
         els.emptyTranscriptMsg.style.display = 'block';
+        state.sentenceBuffer = '';
     });
 
     els.btnClearSelected.addEventListener('click', () => {
